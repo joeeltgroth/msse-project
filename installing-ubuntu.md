@@ -2,50 +2,49 @@
 Below are pictures for the process of installing Ubuntu Linux server
 
 Boot to DVD
-![Boot to DVD](ubuntu-installation/1.jpg){:height="200px"}
+<br><img src="ubuntu-installation/1.jpg" width=300>
 
 
 Choose Ubuntu Server
-![Choose Ubuntu Server](ubuntu-installation/2.jpg)
-
+<br><img src="ubuntu-installation/2.jpg" width=300>
 
 Language
-![Language](ubuntu-installation/3.jpg)
+<br><img src="ubuntu-installation/3.jpg" width=300>
 
 
 Keyboard
-![Keyboard](ubuntu-installation/4.jpg)
+<br><img src="ubuntu-installation/4.jpg" width=300>
 
 Network
-![Network](ubuntu-installation/5.jpg)
+<br><img src="ubuntu-installation/5.jpg" width=300>
 
 Configure Network
-![Configure Network](ubuntu-installation/6.jpg)
+<br><img src="ubuntu-installation/6.jpg" width=300>
 
 Language
-![Language](ubuntu-installation/7.jpg)
+<br><img src="ubuntu-installation/7.jpg" width=300>
 
 Storage 1
-![Storage1](ubuntu-installation/8.jpg)
+<br><img src="ubuntu-installation/8.jpg" width=300>
 
 Storage 2
-![Storage2](ubuntu-installation/9.jpg)
+<br><img src="ubuntu-installation/9.jpg" width=300>
 
 Confirm
-![Confirm](ubuntu-installation/10.jpg)
+<br><img src="ubuntu-installation/10.jpg" width=300>
 
 Name the box and create a user
-![Name](ubuntu-installation/11.jpg)
+<br><img src="ubuntu-installation/11.jpg" width=300>
 
 ssh
-![ssh](ubuntu-installation/12.jpg)
+<br><img src="ubuntu-installation/12.jpg" width=300>
 
 Don't Install Other Packages
-![Packages](ubuntu-installation/13.jpg)
+<br><img src="ubuntu-installation/13.jpg" width=300>
 
 Let Updates Run and Finish
-![Finish](ubuntu-installation/14.jpg)
+<br><img src="ubuntu-installation/14.jpg" width=300>
 
 Six "servers" sitting on my desk
-![Finish](ubuntu-installation/6-computers.jpg)
+<br><img src="ubuntu-installation/6-computers.jpg" width=300>
 
