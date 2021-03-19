@@ -10,6 +10,6 @@ Using the following links as reference, build a Kubernetes cluster on old hardwa
 
 ## Project Notes
 [This document](project-notes.md) contains my notes along the journey. 
-They are not organized well, but will be useful for repeating the 
+They are not organized well yet, but will be useful for repeating the 
 process and preparing a more cohesive presentation. 
 

@@ -12,7 +12,7 @@ Just allocate 192.168.1.x static addresses to the boxes by connecting an unmanag
 
 
 ### The resulting network
-![Physical network](/images/network.png
+![Physical network](/images/network.png)
 
 Have been using this doc to understand how to configure networks on Ubuntu: 
 https://ubuntu.com/server/docs/network-configuration
