@@ -2,7 +2,7 @@
 Below are pictures for the process of installing Ubuntu Linux server
 
 Boot to DVD
-![Boot to DVD](ubuntu-installation/1.jpg)
+![Boot to DVD](ubuntu-installation/1.jpg){:height="200px"}
 
 
 Choose Ubuntu Server
