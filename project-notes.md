@@ -486,5 +486,74 @@ To start administering your cluster from this node, you need to run the followin
 Run 'kubectl get nodes' to see this node join the cluster.
 ```
 
-More to come...  
+Joined the worker nodes to the cluster like this: 
+```
+joe@worker1:~$ sudo kubeadm join 192.168.1.50:6443 --token scof1a.8yq25brso95dywm2 \
+>     --discovery-token-ca-cert-hash sha256:e256108e1e0096867b6d5c8b99273deac4b0b30239a85b42d6cd5dde63776b56
+[sudo] password for joe: 
+[preflight] Running pre-flight checks
+        [WARNING SystemVerification]: this Docker version is not on the list of validated versions: 20.10.5. Latest validated version: 19.03
+[preflight] Reading configuration from the cluster...
+[preflight] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -o yaml'
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Starting the kubelet
+[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...
+
+This node has joined the cluster:
+* Certificate signing request was sent to apiserver and a response was received.
+* The Kubelet was informed of the new secure connection details.
+
+Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+```
+
+To see that it is working, use `kubectl get nodes` or `kubectl get pods -A` from one of the control plane nodes. 
+
+I also copied the ~/.kube/config file to my Macbook (on my network, but not part of the k8s cluster): 
+```
+sftp joe@192.168.1.51:/home/joe/.kube/config k8s-config
+$ kubectl --kubeconfig k8s-config get pods -A -o wide
+NAMESPACE     NAME                           READY   STATUS    RESTARTS   AGE     IP             NODE      NOMINATED NODE   READINESS GATES
+kube-system   coredns-74ff55c5b-dhkqk        1/1     Running   0          51m     10.32.0.3      frhn      <none>           <none>
+kube-system   coredns-74ff55c5b-ptb24        1/1     Running   0          51m     10.32.0.2      frhn      <none>           <none>
+kube-system   etcd-ctbz                      1/1     Running   0          19m     192.168.1.52   ctbz      <none>           <none>
+kube-system   etcd-frhn                      1/1     Running   0          51m     192.168.1.51   frhn      <none>           <none>
+kube-system   kube-apiserver-ctbz            1/1     Running   0          19m     192.168.1.52   ctbz      <none>           <none>
+kube-system   kube-apiserver-frhn            1/1     Running   0          51m     192.168.1.51   frhn      <none>           <none>
+kube-system   kube-controller-manager-ctbz   1/1     Running   0          19m     192.168.1.52   ctbz      <none>           <none>
+kube-system   kube-controller-manager-frhn   1/1     Running   1          51m     192.168.1.51   frhn      <none>           <none>
+kube-system   kube-proxy-5l8pm               1/1     Running   0          12m     192.168.1.53   worker1   <none>           <none>
+kube-system   kube-proxy-5vr8v               1/1     Running   0          21m     192.168.1.52   ctbz      <none>           <none>
+kube-system   kube-proxy-mmtd9               1/1     Running   0          51m     192.168.1.51   frhn      <none>           <none>
+kube-system   kube-proxy-rqw28               1/1     Running   0          9m23s   192.168.1.54   worker2   <none>           <none>
+kube-system   kube-proxy-z242m               1/1     Running   0          8m39s   192.168.1.55   worker3   <none>           <none>
+kube-system   kube-scheduler-ctbz            1/1     Running   0          19m     192.168.1.52   ctbz      <none>           <none>
+kube-system   kube-scheduler-frhn            1/1     Running   1          51m     192.168.1.51   frhn      <none>           <none>
+kube-system   weave-net-27p2s                2/2     Running   1          12m     192.168.1.53   worker1   <none>           <none>
+kube-system   weave-net-brcvv                2/2     Running   1          35m     192.168.1.51   frhn      <none>           <none>
+kube-system   weave-net-jmgsb                2/2     Running   0          9m23s   192.168.1.54   worker2   <none>           <none>
+kube-system   weave-net-jwv76                2/2     Running   0          21m     192.168.1.52   ctbz      <none>           <none>
+kube-system   weave-net-nfdwh                2/2     Running   0          8m39s   192.168.1.55   worker3   <none>           <none>
+```
+Note that there are pods running on all the different nodes. (frhn == ctrl1 and ctbz == ctrl2)
+
+Here is the list of nodes: 
+```
+$ kubectl --kubeconfig k8s-config get nodes -o wide
+NAME      STATUS   ROLES                  AGE     VERSION   INTERNAL-IP    EXTERNAL-IP   OS-IMAGE       KERNEL-VERSION     CONTAINER-RUNTIME
+ctbz      Ready    control-plane,master   22m     v1.20.5   192.168.1.52   <none>        Ubuntu 20.10   5.8.0-45-generic   docker://20.10.5
+frhn      Ready    control-plane,master   53m     v1.20.5   192.168.1.51   <none>        Ubuntu 20.10   5.8.0-45-generic   docker://20.10.5
+worker1   Ready    <none>                 13m     v1.20.5   192.168.1.53   <none>        Ubuntu 20.10   5.8.0-45-generic   docker://20.10.5
+worker2   Ready    <none>                 10m     v1.20.5   192.168.1.54   <none>        Ubuntu 20.10   5.8.0-45-generic   docker://20.10.5
+worker3   Ready    <none>                 9m58s   v1.20.5   192.168.1.55   <none>        Ubuntu 20.10   5.8.0-45-generic   docker://20.10.5
+```
+I wonder why the worker nodes don't have a ROLE... 
+
+
+I tried to install MySql via Helm `$ helm --kubeconfig k8s-config install joes-mysql bitnami/mysql`
+But, the pods have the following error event: 
+`0/5 nodes are available: 5 pod has unbound immediate PersistentVolumeClaims`
+
+Next... remember how to create PVCs. 
+
 
