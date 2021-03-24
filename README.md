@@ -2,7 +2,7 @@
 MSSE SEIS776 Project
 
 ## Goal
-Using the following links as reference, build a Kubernetes cluster on old hardware (Dell Latitude E5520 & 40 Laptops). Documents such as these will be referenced: 
+Using the following links as reference, build a Kubernetes cluster on old hardware (Dell Latitude E5520 & E5540 Laptops). Documents such as these will be referenced: 
 
 [Deploying Kubernetes on Bare Metal](https://www.inap.com/blog/deploying-kubernetes-on-bare-metal/)
 

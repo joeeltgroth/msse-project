@@ -215,5 +215,206 @@ Useful commands when installing DNS:
 
 I did [Step 1: Configuring HAProxy as a Load Balancer](https://www.inap.com/blog/deploying-kubernetes-on-bare-metal/) but the `nc -v $KBLB_ADDR 6443` says "... Connection refused". So, I've either mis-configured HAProxy, or I need to have the Kubernetes control plane running on the ctl1 and ctlr2 boxes before haproxy can serve any traffic to them. 
 
-More to come... 
+I re-installed HAProxy as per the above instructions and now 
+the test of it succeeded: 
+```
+# nc -vz 192.168.1.50 6443
+Connection to 192.168.1.50 6443 port [tcp/*] succeeded!
+```
+
+### Install Docker on Kubernetes Nodes
+
+It seems the instructions on [Step 2: Install Docker and Related Packages on All Kubernetes Nodes](https://www.inap.com/blog/deploying-kubernetes-on-bare-metal/#anchor-2)
+are out of date, so jumped to the [official Docker docs](https://docs.docker.com/engine/install/ubuntu/) 
+
+```bash
+sudo apt update && sudo apt install apt-transport-https  ca-certificates curl gnupg lsb-release
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+echo \
+  "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update && sudo apt install docker-ce docker-ce-cli containerd.io
+
+sudo docker run hello-world
+```
+Docker version 5:20.10.5~3-0~ubuntu-groovy got installed by the above. 
+Repeated on all the control and worker nodes. 
+
+SIDE NOTE: 
+I noticed that sometimes instructions use `apt` and other times `apt-get`.  Curious, I found this [APT vs APT-GET: What's the Difference?](https://phoenixnap.com/kb/apt-vs-apt-get). Looks like `apt` is a newer improvement that combines apt-get with apt-cache, provides better output, and is faster.  So, try to use `apt` when available. It isn't completely backwards compatible. 
+
+### Prepare Kubernetes on all nodes
+Following [Step 3: Prepare Kubernetes on All Nodes](https://www.inap.com/blog/deploying-kubernetes-on-bare-metal/#anchor-3). 
+
+But, found that the Kubernetes official docs also cover this [Installing kubeadm, kubelet and kubectl](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#installing-kubeadm-kubelet-and-kubectl)
+
+```bash
+sudo su -
+apt-get update && apt-get install -y apt-transport-https ca-certificates curl
+curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
+echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+apt-get update && apt-get install -y kubelet kubeadm kubectl && apt-mark hold kubelet kubeadm kubectl
+swapoff -a
+sed -i '/ swap / s/^/#/' /etc/fstab
+kubeadm version
+cat > /etc/docker/daemon.json <<EOF
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2"
+}
+EOF
+mkdir -p /etc/systemd/system/docker.service.d
+systemctl daemon-reload && systemctl restart docker
+```
+Did this on all the control and worker nodes. 
+
+### Install ETCD on the 1st Control node
+
+[Step 4](https://www.inap.com/blog/deploying-kubernetes-on-bare-metal/#anchor-4)
+
+```
+cd /root
+
+cat > kubeadm-config.yaml << EOF
+apiVersion: kubeadm.k8s.io/v1beta1
+kind: ClusterConfiguration
+kubernetesVersion: stable
+apiServer:
+    certSANs:
+      - "192.168.1.50"
+controlPlaneEndpoint: "192.168.1.50:6443"
+etcd:
+     local:
+       endpoints:
+         - "https://192.168.1.51:2379"
+         - "https://192.168.1.52:2379"
+       caFile: /etc/kubernetes/pki/etcd/ca.crt
+       certFile: /etc/kubernetes/pki/apiserver-etcd-client.crt
+       keyFile: /etc/kubernetes/pki/apiserver-etcd-client.key
+EOF
+```
+
+
+```
+# kubeadm init --config=kubeadm-config.yaml --upload-certs
+W0324 02:38:28.946536    8787 common.go:77] your configuration file uses a deprecated API spec: "kubeadm.k8s.io/v1beta1". Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.
+W0324 02:38:28.946901    8787 strict.go:54] error unmarshaling configuration schema.GroupVersionKind{Group:"kubeadm.k8s.io", Version:"v1beta1", Kind:"ClusterConfiguration"}: error unmarshaling JSON: while decoding JSON: json: cannot unmarshal string into Go struct field APIServer.apiServer.certSANs of type []string
+v1beta1.ClusterConfiguration.APIServer: v1beta1.APIServer.CertSANs: []string: decode slice: expect [ or n, but found ", error found in #10 byte of ...|ertSANs":"– \"192.|..., bigger context ...|{"apiServer":{"certSANs":"– \"192.168.1.50\""},"apiVersion":"kubeadm.k8s.i|...
+To see the stack trace of this error execute with --v=5 or higher
+root@frhn:~# kubeadm config migrate --old-config kubeadm-config.yaml --new-config new.yaml
+W0324 02:40:20.974612    8886 strict.go:54] error unmarshaling configuration schema.GroupVersionKind{Group:"kubeadm.k8s.io", Version:"v1beta1", Kind:"ClusterConfiguration"}: error unmarshaling JSON: while decoding JSON: json: cannot unmarshal string into Go struct field APIServer.apiServer.certSANs of type []string
+v1beta1.ClusterConfiguration.APIServer: v1beta1.APIServer.CertSANs: []string: decode slice: expect [ or n, but found ", error found in #10 byte of ...|ertSANs":"– \"192.|..., bigger context ...|{"apiServer":{"certSANs":"– \"192.168.1.50\""},"apiVersion":"kubeadm.k8s.i|...
+To see the stack trace of this error execute with --v=5 or higher
+root@frhn:~# vi kubeadm-config.yaml 
+root@frhn:~# kubeadm config migrate --old-config kubeadm-config.yaml --new-config new.yaml
+W0324 02:42:50.829878    9020 strict.go:54] error unmarshaling configuration schema.GroupVersionKind{Group:"kubeadm.k8s.io", Version:"v1beta1", Kind:"ClusterConfiguration"}: error unmarshaling JSON: while decoding JSON: json: cannot unmarshal string into Go struct field APIServer.apiServer.certSANs of type []string
+v1beta1.ClusterConfiguration.APIServer: v1beta1.APIServer.CertSANs: []string: decode slice: expect [ or n, but found ", error found in #10 byte of ...|ertSANs":"– \"192.|..., bigger context ...|{"apiServer":{"certSANs":"– \"192.168.1.50\""},"apiVersion":"kubeadm.k8s.i|...
+To see the stack trace of this error execute with --v=5 or higher
+root@frhn:~# vi kubeadm-config.yaml 
+root@frhn:~# kubeadm config migrate --old-config kubeadm-config.yaml --new-config new.yaml
+W0324 02:43:56.040299    9077 strict.go:54] error unmarshaling configuration schema.GroupVersionKind{Group:"kubeadm.k8s.io", Version:"v1beta1", Kind:"ClusterConfiguration"}: error unmarshaling JSON: while decoding JSON: json: unknown field "caFile"
+root@frhn:~# vi kubeadm-config.yaml 
+root@frhn:~# kubeadm config migrate --old-config kubeadm-config.yaml --new-config new.yaml
+W0324 02:44:57.718960    9170 strict.go:54] error unmarshaling configuration schema.GroupVersionKind{Group:"kubeadm.k8s.io", Version:"v1beta1", Kind:"ClusterConfiguration"}: error unmarshaling JSON: while decoding JSON: json: unknown field "caFile"
+root@frhn:~# vi kubeadm-config.yaml 
+root@frhn:~# kubeadm init --config=kubeadm-config.yaml --upload-certs
+W0324 02:46:31.348079    9289 common.go:77] your configuration file uses a deprecated API spec: "kubeadm.k8s.io/v1beta1". Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.
+W0324 02:46:31.348482    9289 strict.go:54] error unmarshaling configuration schema.GroupVersionKind{Group:"kubeadm.k8s.io", Version:"v1beta1", Kind:"ClusterConfiguration"}: error unmarshaling JSON: while decoding JSON: json: unknown field "caFile"
+[init] Using Kubernetes version: v1.20.5
+[preflight] Running pre-flight checks
+        [WARNING SystemVerification]: this Docker version is not on the list of validated versions: 20.10.5. Latest validated version: 19.03
+[preflight] Pulling images required for setting up a Kubernetes cluster
+[preflight] This might take a minute or two, depending on the speed of your internet connection
+[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'
+[certs] Using certificateDir folder "/etc/kubernetes/pki"
+[certs] Generating "ca" certificate and key
+[certs] Generating "apiserver" certificate and key
+[certs] apiserver serving cert is signed for DNS names [frhn kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [10.96.0.1 192.168.1.51 192.168.1.50]
+[certs] Generating "apiserver-kubelet-client" certificate and key
+[certs] Generating "front-proxy-ca" certificate and key
+[certs] Generating "front-proxy-client" certificate and key
+[certs] Generating "etcd/ca" certificate and key
+[certs] Generating "etcd/server" certificate and key
+[certs] etcd/server serving cert is signed for DNS names [frhn localhost] and IPs [192.168.1.51 127.0.0.1 ::1]
+[certs] Generating "etcd/peer" certificate and key
+[certs] etcd/peer serving cert is signed for DNS names [frhn localhost] and IPs [192.168.1.51 127.0.0.1 ::1]
+[certs] Generating "etcd/healthcheck-client" certificate and key
+[certs] Generating "apiserver-etcd-client" certificate and key
+[certs] Generating "sa" key and public key
+[kubeconfig] Using kubeconfig folder "/etc/kubernetes"
+[kubeconfig] Writing "admin.conf" kubeconfig file
+[kubeconfig] Writing "kubelet.conf" kubeconfig file
+[kubeconfig] Writing "controller-manager.conf" kubeconfig file
+[kubeconfig] Writing "scheduler.conf" kubeconfig file
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Starting the kubelet
+[control-plane] Using manifest folder "/etc/kubernetes/manifests"
+[control-plane] Creating static Pod manifest for "kube-apiserver"
+[control-plane] Creating static Pod manifest for "kube-controller-manager"
+[control-plane] Creating static Pod manifest for "kube-scheduler"
+[etcd] Creating static Pod manifest for local etcd in "/etc/kubernetes/manifests"
+[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory "/etc/kubernetes/manifests". This can take up to 4m0s
+[kubelet-check] Initial timeout of 40s passed.
+[apiclient] All control plane components are healthy after 85.524579 seconds
+[upload-config] Storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
+[kubelet] Creating a ConfigMap "kubelet-config-1.20" in namespace kube-system with the configuration for the kubelets in the cluster
+[upload-certs] Storing the certificates in Secret "kubeadm-certs" in the "kube-system" Namespace
+[upload-certs] Using certificate key:
+f58dfe7489c3d0653eee6e3d96b861ca45f3d052b0533b373f9bbb521d83f08e
+[mark-control-plane] Marking the node frhn as control-plane by adding the labels "node-role.kubernetes.io/master=''" and "node-role.kubernetes.io/control-plane='' (deprecated)"
+[mark-control-plane] Marking the node frhn as control-plane by adding the taints [node-role.kubernetes.io/master:NoSchedule]
+[bootstrap-token] Using token: scof1a.8yq25brso95dywm2
+[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles
+[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to get nodes
+[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
+[bootstrap-token] configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
+[bootstrap-token] configured RBAC rules to allow certificate rotation for all node client certificates in the cluster
+[bootstrap-token] Creating the "cluster-info" ConfigMap in the "kube-public" namespace
+[kubelet-finalize] Updating "/etc/kubernetes/kubelet.conf" to point to a rotatable kubelet client certificate and key
+[addons] Applied essential addon: CoreDNS
+[addons] Applied essential addon: kube-proxy
+
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+You can now join any number of the control-plane node running the following command on each as root:
+
+  kubeadm join 192.168.1.50:6443 --token scof1a.8yq25brso95dywm2 \
+    --discovery-token-ca-cert-hash sha256:e256108e1e0096867b6d5c8b99273deac4b0b30239a85b42d6cd5dde63776b56 \
+    --control-plane --certificate-key f58dfe7489c3d0653eee6e3d96b861ca45f3d052b0533b373f9bbb521d83f08e
+
+Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
+As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use
+"kubeadm init phase upload-certs --upload-certs" to reload certs afterward.
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.168.1.50:6443 --token scof1a.8yq25brso95dywm2 \
+    --discovery-token-ca-cert-hash sha256:e256108e1e0096867b6d5c8b99273deac4b0b30239a85b42d6cd5dde63776b56
+```
+
+
+
+More to come...   (Pick it up at "You should now deploy a pod network to the cluster." above)
 
