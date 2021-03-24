@@ -550,9 +550,26 @@ worker3   Ready    <none>                 9m58s   v1.20.5   192.168.1.55   <none
 I wonder why the worker nodes don't have a ROLE... 
 
 
+Learning: 
+I rebooted one of the worker nodes. When it came up, `k get nodes` showed that the node was not ready. This
+[Stackoverflow doc](https://stackoverflow.com/questions/47107117/how-to-debug-when-kubernetes-nodes-are-in-not-ready-state) had some nice
+troubleshooting steps. In this case: 
+```
+journalctl -u kubelet
+swapoff -a
+sudo sed -i '/ swap / s/^/#/' /etc/fstab
+sudo systemctl restart kubelet
+journalctl -u kubelet
+```
+This fixed it.  The journalctl log was showing something about not being able to run with swap on.  The `swapoff -a` is probably what
+fixed it.  But, why didn't that default on startup.  Probably that `sed...` command is not working.
+Need to understand /etc/fstab - it probably is what the system would look at on boot to configure swapoff. 
+
+
 I tried to install MySql via Helm `$ helm --kubeconfig k8s-config install joes-mysql bitnami/mysql`
 But, the pods have the following error event: 
 `0/5 nodes are available: 5 pod has unbound immediate PersistentVolumeClaims`
+
 
 Next... remember how to create PVCs. 
 
