@@ -555,9 +555,12 @@ I rebooted one of the worker nodes. When it came up, `k get nodes` showed that t
 [Stackoverflow doc](https://stackoverflow.com/questions/47107117/how-to-debug-when-kubernetes-nodes-are-in-not-ready-state) had some nice
 troubleshooting steps. In this case: 
 ```
+systemctl status kubelet
+systemctl status docker
 journalctl -u kubelet
 swapoff -a
 sudo sed -i '/ swap / s/^/#/' /etc/fstab
+systemctl daemon-reload
 sudo systemctl restart kubelet
 journalctl -u kubelet
 ```
@@ -569,6 +572,42 @@ Need to understand /etc/fstab - it probably is what the system would look at on 
 I tried to install MySql via Helm `$ helm --kubeconfig k8s-config install joes-mysql bitnami/mysql`
 But, the pods have the following error event: 
 `0/5 nodes are available: 5 pod has unbound immediate PersistentVolumeClaims`
+
+
+### Using [Sonobuoy](https://sonobuoy.io/docs/v0.50.0/) to Validate the Cluster
+
+Sonobuoy is a tool that runs a series of tests to validate that a cluster [conforms](https://github.com/kubernetes/kubernetes/tree/master/cluster/images/conformance) that is [supports the required APIs](https://www.cncf.io/certification/software-conformance/). Below is a run of that tool against the cluster created above.  It didn't fail.
+Lots of tests were skipped though. Re-running with `sonobuoy run -m certified-conformance --wait`
+
+```
+$ sonobuoy run --wait
+INFO[0000] created object                                name=sonobuoy namespace= resource=namespaces
+INFO[0000] created object                                name=sonobuoy-serviceaccount namespace=sonobuoy resource=serviceaccounts
+INFO[0000] created object                                name=sonobuoy-serviceaccount-sonobuoy namespace= resource=clusterrolebindings
+INFO[0000] created object                                name=sonobuoy-serviceaccount-sonobuoy namespace= resource=clusterroles
+INFO[0000] created object                                name=sonobuoy-config-cm namespace=sonobuoy resource=configmaps
+INFO[0000] created object                                name=sonobuoy-plugins-cm namespace=sonobuoy resource=configmaps
+INFO[0000] created object                                name=sonobuoy namespace=sonobuoy resource=pods
+INFO[0000] created object                                name=sonobuoy-aggregator namespace=sonobuoy resource=services
+
+$ results=$(sonobuoy retrieve)
+
+$ sonobuoy results $results
+Plugin: e2e
+Status: passed
+Total: 5667
+Passed: 309
+Failed: 0
+Skipped: 5358
+
+Plugin: systemd-logs
+Status: passed
+Total: 5
+Passed: 5
+Failed: 0
+Skipped: 0
+```
+
 
 
 Next... remember how to create PVCs. 
