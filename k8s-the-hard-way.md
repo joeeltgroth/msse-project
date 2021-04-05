@@ -185,3 +185,35 @@ for instance in control1 control2 control3; do scp ca.pem ca-key.pem kubernetes-
 
 ## [Generating Kubernetes Configuration Files for Authentication](https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/05-kubernetes-configuration-files.md)
 
+Since I don't have a load balancer like GCP does, I will use the address of the 1st control plane node. Yes, so the two extra control plane nodes won't get used much. 
+I could install haproxy and load balance across them, but in my configuration that's a single point of failure also. 
+
+```
+KUBERNETES_PUBLIC_ADDRESS="192.168.1.50"
+```
+and then I ran the scripts as-is, but replaced worker-0 with worker1, etc. 
+
+```
+for instance in worker1 worker2 worker3; do scp ${instance}.kubeconfig kube-proxy.kubeconfig joe@${instance}:~/; done
+for instance in control1 control2 control3; do scp ca.pem admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig  joe@${instance}:~/; done
+```
+
+
+## [Generating the Data Encryption Config and Key](https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/06-data-encryption-keys.md)
+
+```
+for instance in control1 control2 control3; do scp encryption-config.yaml   joe@${instance}:~/; done
+```
+
+
+## [Bootstrapping the etcd Cluster](https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/07-bootstrapping-etcd.md)
+
+Noticed that there's a newer version of ETCD: 3.4.15. Will use that instead of 3.4.10. 
+
+```
+"https://github.com/etcd-io/etcd/releases/download/v3.4.10/etcd-v3.4.10-linux-amd64.tar.gz"
+tar -xvf etcd-v3.4.15-linux-amd64.tar.gz
+sudo mv etcd-v3.4.15-linux-amd64/etcd* /usr/local/bin/
+```
+
+
